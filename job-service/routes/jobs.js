@@ -2,6 +2,7 @@ const express = require('express');
 const pool = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const router = express.Router();
+const redisClient = require('../redisClient');
 
 // Create a job posting — employer only
 router.post('/', requireAuth, requireRole('employer'), async (req, res) => {
@@ -17,6 +18,7 @@ router.post('/', requireAuth, requireRole('employer'), async (req, res) => {
       [company_id, title, description || null, 'open']
     );
 
+    await redisClient.del('jobs:hot');
     res.status(201).json({ id: result.insertId, company_id, title, description, status: 'open' });
   } catch (err) {
     console.error(err);
@@ -77,6 +79,7 @@ router.patch('/:id', requireAuth, requireRole('employer'), async (req, res) => {
       [title || null, description || null, status || null, jobId]
     );
 
+    await redisClient.del('jobs:hot');
     res.json({ message: 'Job updated' });
   } catch (err) {
     console.error(err);
@@ -104,7 +107,53 @@ router.delete('/:id', requireAuth, requireRole('employer'), async (req, res) => 
     }
 
     await pool.query('DELETE FROM jobs WHERE id = ?', [jobId]);
+    await redisClient.del('jobs:hot');
     res.json({ message: 'Job deleted' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong' });
+  }
+});
+
+
+
+router.get('/', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+    const search = req.query.search;
+
+    // Only cache the plain, unfiltered "hot" listing — page 1, no search, default limit
+    const isCacheable = page === 1 && limit === 20 && !search;
+    const cacheKey = 'jobs:hot';
+
+    if (isCacheable) {
+      const cached = await redisClient.get(cacheKey);
+      if (cached) {
+        return res.json(JSON.parse(cached));
+      }
+    }
+
+    let query = 'SELECT * FROM jobs WHERE status = "open"';
+    const params = [];
+
+    if (search) {
+      query += ' AND title LIKE ?';
+      params.push(`%${search}%`);
+    }
+
+    query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+
+    const [rows] = await pool.query(query, params);
+    const response = { page, limit, results: rows };
+
+    if (isCacheable) {
+      await redisClient.setEx(cacheKey, 60, JSON.stringify(response)); // cache for 60 seconds
+    }
+
+    res.json(response);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Something went wrong' });
