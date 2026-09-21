@@ -2,6 +2,7 @@ const express = require('express');
 const pool = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const router = express.Router();
+const { publishApplicationCreated } = require('../queue');
 
 // Candidate applies to a job
 router.post('/', requireAuth, requireRole('candidate'), async (req, res) => {
@@ -19,6 +20,12 @@ router.post('/', requireAuth, requireRole('candidate'), async (req, res) => {
       'INSERT INTO applications (job_id, candidate_id, status) VALUES (?, ?, ?)',
       [job_id, req.user.id, 'applied']
     );
+
+    publishApplicationCreated({
+      application_id: result.insertId,
+      job_id,
+      candidate_id: req.user.id,
+    });
 
     res.status(201).json({ id: result.insertId, job_id, candidate_id: req.user.id, status: 'applied' });
   } catch (err) {
