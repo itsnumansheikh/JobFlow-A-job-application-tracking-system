@@ -3,7 +3,7 @@ const express = require('express');
 const applicationRoutes = require('./routes/applications');
 const { connectQueue } = require('./queue');
 
-const app = express();
+const app = require('./app');
 app.use(express.json());
 app.use('/applications', applicationRoutes);
 
