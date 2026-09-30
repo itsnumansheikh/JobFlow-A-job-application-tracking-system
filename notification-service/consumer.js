@@ -2,7 +2,8 @@ const amqp = require('amqplib');
 const pool = require('./db');
 
 async function startConsumer() {
-  const connection = await amqp.connect('amqp://localhost');
+  const host = process.env.RABBITMQ_HOST || 'localhost';
+  const connection = await amqp.connect(`amqp://${host}`);
   const channel = await connection.createChannel();
   const queue = 'application_created';
 

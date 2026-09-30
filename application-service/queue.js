@@ -4,7 +4,8 @@ let connection;
 let channel;
 
 async function connectQueue() {
-  connection = await amqp.connect('amqp://localhost');
+  const host = process.env.RABBITMQ_HOST || 'localhost';
+  connection = await amqp.connect(`amqp://${host}`);
   channel = await connection.createChannel();
   await channel.assertQueue('application_created', { durable: true });
   console.log('Connected to RabbitMQ, queue ready');

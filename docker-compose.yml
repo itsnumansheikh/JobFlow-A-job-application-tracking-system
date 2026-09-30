@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: ""
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+      MYSQL_DATABASE: jobflow
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  auth-service:
+    build: ./auth-service
+    ports:
+      - "5000:5000"
+    environment:
+      DB_HOST: mysql
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: jobflow
+      JWT_SECRET: your_actual_jwt_secret_here
+      PORT: 5000
+    depends_on:
+      - mysql
+
+  job-service:
+    build: ./job-service
+    ports:
+      - "5001:5001"
+    environment:
+      DB_HOST: mysql
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: jobflow
+      JWT_SECRET: your_actual_jwt_secret_here
+      PORT: 5001
+      REDIS_HOST: redis
+    depends_on:
+      - mysql
+      - redis
+
+  application-service:
+    build: ./application-service
+    ports:
+      - "5002:5002"
+    environment:
+      DB_HOST: mysql
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: jobflow
+      JWT_SECRET: your_actual_jwt_secret_here
+      PORT: 5002
+      RABBITMQ_HOST: rabbitmq
+    depends_on:
+      - mysql
+      - rabbitmq
+
+  notification-service:
+    build: ./notification-service
+    environment:
+      DB_HOST: mysql
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: jobflow
+      RABBITMQ_HOST: rabbitmq
+    depends_on:
+      - mysql
+      - rabbitmq
+
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: 8080
+      AUTH_SERVICE_URL: http://auth-service:5000
+      JOB_SERVICE_URL: http://job-service:5001
+      APPLICATION_SERVICE_URL: http://application-service:5002
+    depends_on:
+      - auth-service
+      - job-service
+      - application-service
+
+volumes:
+  mysql-data:
