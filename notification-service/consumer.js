@@ -3,7 +3,24 @@ const pool = require('./db');
 
 async function startConsumer() {
   const host = process.env.RABBITMQ_HOST || 'localhost';
-  const connection = await amqp.connect(`amqp://${host}`);
+  let connection;
+  const retries = 10;
+  const delayMs = 3000;
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      connection = await amqp.connect(`amqp://${host}`);
+      break;
+    } catch (err) {
+      console.log(`RabbitMQ not ready yet (attempt ${attempt}/${retries}), retrying in ${delayMs / 1000}s...`);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  if (!connection) {
+    throw new Error('Could not connect to RabbitMQ after multiple attempts');
+  }
+
   const channel = await connection.createChannel();
   const queue = 'application_created';
 

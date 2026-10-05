@@ -8,7 +8,7 @@ services:
       MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
       MYSQL_DATABASE: jobflow
     ports:
-      - "3306:3306"
+      - "3310:3306"
     volumes:
       - mysql-data:/var/lib/mysql
 
