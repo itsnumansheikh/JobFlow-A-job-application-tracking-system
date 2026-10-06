@@ -1,0 +1,145 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-auth-service:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./auth-service
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+          MYSQL_DATABASE: jobflow
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install
+      - name: Wait for MySQL and create schema
+        run: |
+          sudo apt-get install -y mysql-client
+          until mysqladmin ping -h 127.0.0.1 --silent; do sleep 2; done
+          mysql -h 127.0.0.1 -u root jobflow < ../schema.sql
+      - run: npm test
+        env:
+          DB_HOST: 127.0.0.1
+          DB_USER: root
+          DB_PASSWORD: ""
+          DB_NAME: jobflow
+          JWT_SECRET: ci_test_secret_key
+
+  test-job-service:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./job-service
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+          MYSQL_DATABASE: jobflow
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install
+      - name: Wait for MySQL and create schema
+        run: |
+          sudo apt-get install -y mysql-client
+          until mysqladmin ping -h 127.0.0.1 --silent; do sleep 2; done
+          mysql -h 127.0.0.1 -u root jobflow < ../schema.sql
+      - run: npm test
+        env:
+          DB_HOST: 127.0.0.1
+          DB_USER: root
+          DB_PASSWORD: ""
+          DB_NAME: jobflow
+          JWT_SECRET: ci_test_secret_key
+          REDIS_HOST: 127.0.0.1
+
+  test-application-service:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./application-service
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+          MYSQL_DATABASE: jobflow
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+      rabbitmq:
+        image: rabbitmq:3-management-alpine
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd="rabbitmq-diagnostics -q ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install
+      - name: Wait for MySQL and create schema
+        run: |
+          sudo apt-get install -y mysql-client
+          until mysqladmin ping -h 127.0.0.1 --silent; do sleep 2; done
+          mysql -h 127.0.0.1 -u root jobflow < ../schema.sql
+      - run: npm test
+        env:
+          DB_HOST: 127.0.0.1
+          DB_USER: root
+          DB_PASSWORD: ""
+          DB_NAME: jobflow
+          JWT_SECRET: ci_test_secret_key
+          RABBITMQ_HOST: 127.0.0.1
+
+  build-images:
+    needs: [test-auth-service, test-job-service, test-application-service]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [auth-service, job-service, application-service, notification-service, api-gateway]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t jobflow-${{ matrix.service }}:ci ./${{ matrix.service }}
