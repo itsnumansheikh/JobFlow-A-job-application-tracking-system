@@ -12,13 +12,20 @@ let testJobId;
 let createdApplicationId;
 
 describe('Application Service', () => {
-  beforeAll(async () => {
-    await connectQueue(); // queue.js needs an active channel before publishApplicationCreated can be called
+  let testCompanyId;
 
-    // Create a throwaway job directly in the DB so this test doesn't depend on Job Service being up
+  beforeAll(async () => {
+    await connectQueue();
+
+    const [companyResult] = await pool.query(
+      'INSERT INTO companies (name, description, owner_user_id) VALUES (?, ?, ?)',
+      ['Test Company For Applications', 'temp', 2]
+    );
+    testCompanyId = companyResult.insertId;
+
     const [result] = await pool.query(
       'INSERT INTO jobs (company_id, title, description, status) VALUES (?, ?, ?, ?)',
-      [1, 'Test Job For Applications', 'temp', 'open']
+      [testCompanyId, 'Test Job For Applications', 'temp', 'open']
     );
     testJobId = result.insertId;
   });
@@ -29,6 +36,9 @@ describe('Application Service', () => {
     }
     if (testJobId) {
         await pool.query('DELETE FROM jobs WHERE id = ?', [testJobId]);
+    }
+    if (testCompanyId) {
+        await pool.query('DELETE FROM companies WHERE id = ?', [testCompanyId]);
     }
     await pool.end();
     await closeQueue();
