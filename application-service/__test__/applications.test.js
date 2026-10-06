@@ -6,19 +6,28 @@ const jwt = require('jsonwebtoken');
 const { connectQueue, closeQueue } = require('../queue');
 
 const candidateToken = jwt.sign({ id: 1, role: 'candidate' }, process.env.JWT_SECRET, { expiresIn: '15m' });
-const employerToken = jwt.sign({ id: 2, role: 'employer' }, process.env.JWT_SECRET, { expiresIn: '15m' });
+
 
 let testJobId;
 let createdApplicationId;
 let testCompanyId;
+let testEmployerId;
+let employerToken;
 
 describe('Application Service', () => {
   beforeAll(async () => {
     await connectQueue();
 
+    const [userResult] = await pool.query(
+      'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
+      ['Test Employer', `test-employer-${Date.now()}@test.com`, 'dummy_hash', 'employer']
+    );
+    testEmployerId = userResult.insertId;
+    employerToken = jwt.sign({ id: testEmployerId, role: 'employer' }, process.env.JWT_SECRET, { expiresIn: '15m' });
+
     const [companyResult] = await pool.query(
       'INSERT INTO companies (name, description, owner_user_id) VALUES (?, ?, ?)',
-      ['Test Company For Applications', 'temp', 2]
+      ['Test Company For Applications', 'temp', testEmployerId]
     );
     testCompanyId = companyResult.insertId;
 
@@ -31,13 +40,16 @@ describe('Application Service', () => {
 
   afterAll(async () => {
     if (createdApplicationId) {
-        await pool.query('DELETE FROM applications WHERE id = ?', [createdApplicationId]);
+      await pool.query('DELETE FROM applications WHERE id = ?', [createdApplicationId]);
     }
     if (testJobId) {
-        await pool.query('DELETE FROM jobs WHERE id = ?', [testJobId]);
+      await pool.query('DELETE FROM jobs WHERE id = ?', [testJobId]);
     }
     if (testCompanyId) {
-        await pool.query('DELETE FROM companies WHERE id = ?', [testCompanyId]);
+      await pool.query('DELETE FROM companies WHERE id = ?', [testCompanyId]);
+    }
+    if (testEmployerId) {
+      await pool.query('DELETE FROM users WHERE id = ?', [testEmployerId]);
     }
     await pool.end();
     await closeQueue();

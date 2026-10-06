@@ -6,31 +6,42 @@ const redisClient = require('../redisClient');
 
 // Build fake tokens directly instead of hitting Auth Service over HTTP —
 // this keeps Job Service's tests independent of Auth Service being up
-const employerToken = jwt.sign({ id: 2, role: 'employer' }, process.env.JWT_SECRET, { expiresIn: '15m' });
 const candidateToken = jwt.sign({ id: 1, role: 'candidate' }, process.env.JWT_SECRET, { expiresIn: '15m' });
 
 let createdJobId;
 let testCompanyId;
+let testEmployerId;
+let employerToken;
 
 describe('Job Service', () => {
   beforeAll(async () => {
+    const [userResult] = await pool.query(
+      'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
+      ['Test Employer', `test-employer-${Date.now()}@test.com`, 'dummy_hash', 'employer']
+    );
+    testEmployerId = userResult.insertId;
+    employerToken = jwt.sign({ id: testEmployerId, role: 'employer' }, process.env.JWT_SECRET, { expiresIn: '15m' });
+
     const [companyResult] = await pool.query(
       'INSERT INTO companies (name, description, owner_user_id) VALUES (?, ?, ?)',
-      ['Test Company For Jobs', 'temp', 2]
+      ['Test Company For Jobs', 'temp', testEmployerId]
     );
     testCompanyId = companyResult.insertId;
   });
 
   afterAll(async () => {
-  if (createdJobId) {
-    await pool.query('DELETE FROM jobs WHERE id = ?', [createdJobId]);
-  }
-  if (testCompanyId) {
-    await pool.query('DELETE FROM companies WHERE id = ?', [testCompanyId]);
-  }
-  await pool.end();
-  await redisClient.quit(); // closes the Redis connection so Jest can exit cleanly
-});
+    if (createdJobId) {
+      await pool.query('DELETE FROM jobs WHERE id = ?', [createdJobId]);
+    }
+    if (testCompanyId) {
+      await pool.query('DELETE FROM companies WHERE id = ?', [testCompanyId]);
+    }
+    if (testEmployerId) {
+      await pool.query('DELETE FROM users WHERE id = ?', [testEmployerId]);
+    }
+    await pool.end();
+    await redisClient.quit();
+  });
 
   test('employer can create a job', async () => {
     const res = await request(app)
