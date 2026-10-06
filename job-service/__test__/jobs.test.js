@@ -10,11 +10,23 @@ const employerToken = jwt.sign({ id: 2, role: 'employer' }, process.env.JWT_SECR
 const candidateToken = jwt.sign({ id: 1, role: 'candidate' }, process.env.JWT_SECRET, { expiresIn: '15m' });
 
 let createdJobId;
+let testCompanyId;
 
 describe('Job Service', () => {
+  beforeAll(async () => {
+    const [companyResult] = await pool.query(
+      'INSERT INTO companies (name, description, owner_user_id) VALUES (?, ?, ?)',
+      ['Test Company For Jobs', 'temp', 2]
+    );
+    testCompanyId = companyResult.insertId;
+  });
+
   afterAll(async () => {
   if (createdJobId) {
     await pool.query('DELETE FROM jobs WHERE id = ?', [createdJobId]);
+  }
+  if (testCompanyId) {
+    await pool.query('DELETE FROM companies WHERE id = ?', [testCompanyId]);
   }
   await pool.end();
   await redisClient.quit(); // closes the Redis connection so Jest can exit cleanly

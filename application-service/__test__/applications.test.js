@@ -10,10 +10,9 @@ const employerToken = jwt.sign({ id: 2, role: 'employer' }, process.env.JWT_SECR
 
 let testJobId;
 let createdApplicationId;
+let testCompanyId;
 
 describe('Application Service', () => {
-  let testCompanyId;
-
   beforeAll(async () => {
     await connectQueue();
 
