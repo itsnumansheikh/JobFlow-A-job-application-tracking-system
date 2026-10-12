@@ -5,6 +5,7 @@ const pool = require('../db');
 const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const crypto = require('crypto');
+const validator = require('validator');
 
 
 const loginLimiter = rateLimit({
@@ -14,12 +15,28 @@ const loginLimiter = rateLimit({
 });
 
 
-router.post('/signup', async (req, res) => {
+const sensitiveLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Too many requests. Try again later.' },
+});
+
+
+router.post('/signup',sensitiveLimiter, async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
 
     if (!name || !email || !password || !role) {
       return res.status(400).json({ error: 'All fields are required' });
+    }
+    if (!validator.isEmail(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+    if (name.length > 100) {
+      return res.status(400).json({ error: 'Name too long' });
     }
     if (!['candidate', 'employer'].includes(role)) {
       return res.status(400).json({ error: 'Role must be candidate or employer' });
@@ -48,7 +65,7 @@ router.post('/signup', async (req, res) => {
 
 const jwt = require('jsonwebtoken');
 
-router.post('/login', loginLimiter, async (req, res) => {
+router.post('/login', loginLimiter, sensitiveLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -136,7 +153,7 @@ router.post('/logout', async (req, res) => {
 
 
 
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', sensitiveLimiter, async (req, res) => {
   try {
     const { email } = req.body;
     const [rows] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
@@ -156,14 +173,17 @@ router.post('/forgot-password', async (req, res) => {
 
     // TEMP: return token directly since there's no email service yet.
     // Once Notification Service exists, this becomes: queue an email instead of returning it.
-    res.json({ message: 'Reset token generated', resetToken });
+    if (process.env.NODE_ENV !== 'production') {
+      return res.json({ message: 'Reset token generated', resetToken });
+    }
+    res.json({ message: 'If that email exists, a reset link was sent' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
 
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', sensitiveLimiter, async (req, res) => {
   try {
     const { resetToken, newPassword } = req.body;
     if (!resetToken || !newPassword) {

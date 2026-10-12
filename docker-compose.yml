@@ -32,7 +32,7 @@ services:
       DB_USER: root
       DB_PASSWORD: ""
       DB_NAME: jobflow
-      JWT_SECRET: your_actual_jwt_secret_here
+      JWT_SECRET: 441fa6ac41c5712cf8098bc740ae826aab7c5c01055fcb84efbaa0ceffa1e987c5c76ecb9f0ba70807e5a01d0bbfdc767911e96f2d3ff8dba598f42b4dd0d24c
       PORT: 5000
     depends_on:
       - mysql
@@ -46,7 +46,7 @@ services:
       DB_USER: root
       DB_PASSWORD: ""
       DB_NAME: jobflow
-      JWT_SECRET: your_actual_jwt_secret_here
+      JWT_SECRET: 441fa6ac41c5712cf8098bc740ae826aab7c5c01055fcb84efbaa0ceffa1e987c5c76ecb9f0ba70807e5a01d0bbfdc767911e96f2d3ff8dba598f42b4dd0d24c
       PORT: 5001
       REDIS_HOST: redis
     depends_on:
@@ -62,7 +62,7 @@ services:
       DB_USER: root
       DB_PASSWORD: ""
       DB_NAME: jobflow
-      JWT_SECRET: your_actual_jwt_secret_here
+      JWT_SECRET: 441fa6ac41c5712cf8098bc740ae826aab7c5c01055fcb84efbaa0ceffa1e987c5c76ecb9f0ba70807e5a01d0bbfdc767911e96f2d3ff8dba598f42b4dd0d24c
       PORT: 5002
       RABBITMQ_HOST: rabbitmq
     depends_on:

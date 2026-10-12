@@ -2,8 +2,15 @@ require('dotenv').config();
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { createProxyMiddleware } = require('http-proxy-middleware');
+const helmet = require('helmet');
+const cors = require('cors');
 
 const app = express();
+app.use(helmet());
+app.use(cors({
+  origin: process.env.ALLOWED_ORIGIN || 'http://localhost:3000',
+  methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+}));
 
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
