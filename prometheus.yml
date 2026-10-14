@@ -1,0 +1,12 @@
+global:
+  scrape_interval: 10s
+
+scrape_configs:
+  - job_name: jobflow
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - auth-service:5000
+          - job-service:5001
+          - application-service:5002
+          - api-gateway:8080

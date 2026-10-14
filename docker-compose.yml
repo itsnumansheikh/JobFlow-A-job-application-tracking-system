@@ -22,6 +22,12 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 5672 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
   auth-service:
     build: ./auth-service
@@ -65,9 +71,12 @@ services:
       JWT_SECRET: 441fa6ac41c5712cf8098bc740ae826aab7c5c01055fcb84efbaa0ceffa1e987c5c76ecb9f0ba70807e5a01d0bbfdc767911e96f2d3ff8dba598f42b4dd0d24c
       PORT: 5002
       RABBITMQ_HOST: rabbitmq
+    restart: on-failure
     depends_on:
-      - mysql
-      - rabbitmq
+      mysql:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
 
   notification-service:
     build: ./notification-service
@@ -77,9 +86,12 @@ services:
       DB_PASSWORD: ""
       DB_NAME: jobflow
       RABBITMQ_HOST: rabbitmq
+    restart: on-failure
     depends_on:
-      - mysql
-      - rabbitmq
+      mysql:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
 
   api-gateway:
     build: ./api-gateway
@@ -94,6 +106,25 @@ services:
       - auth-service
       - job-service
       - application-service
+
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      - prometheus
 
 volumes:
   mysql-data:
